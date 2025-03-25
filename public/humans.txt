@@ -15,7 +15,7 @@ Name: Tailwind CSS Team
 Website: https://tailwindcss.com
 
 /* SITE */
-Last update: 2024/02/20
+Last update: 2025/03/25
 Standards: HTML5, CSS3, JavaScript
 Components: React, Material-UI, Tailwind CSS, Chart.js
 Software: Visual Studio Code, Git 
