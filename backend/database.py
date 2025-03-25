@@ -1,0 +1,61 @@
+import sqlite3
+from pathlib import Path
+
+# Caminho para o arquivo do banco de dados
+DB_PATH = Path(__file__).parent / "finance.db"
+
+def init_db():
+    """Inicializa o banco de dados e cria as tabelas necessárias."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    # Criar tabela de transações
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS transactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL,
+        description TEXT NOT NULL,
+        amount REAL NOT NULL,
+        category TEXT NOT NULL,
+        type TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+    
+    # Criar tabela de categorias
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        type TEXT NOT NULL
+    )
+    ''')
+    
+    # Inserir algumas categorias padrão
+    default_categories = [
+        ('Salário', 'income'),
+        ('Investimentos', 'income'),
+        ('Alimentação', 'expense'),
+        ('Transporte', 'expense'),
+        ('Moradia', 'expense'),
+        ('Saúde', 'expense'),
+        ('Educação', 'expense'),
+        ('Lazer', 'expense'),
+        ('Outros', 'expense')
+    ]
+    
+    cursor.executemany('''
+    INSERT OR IGNORE INTO categories (name, type)
+    VALUES (?, ?)
+    ''', default_categories)
+    
+    conn.commit()
+    conn.close()
+
+def get_db_connection():
+    """Retorna uma conexão com o banco de dados."""
+    return sqlite3.connect(DB_PATH)
+
+if __name__ == "__main__":
+    init_db()
+    print("Banco de dados inicializado com sucesso!") 
