@@ -1,0 +1,7 @@
+Contact: mailto:security@dashboardfinanceiro.com
+Expires: 2025-02-20T00:00:00.000Z
+Encryption: https://dashboardfinanceiro.com/pgp-key.txt
+Acknowledgments: https://dashboardfinanceiro.com/hall-of-fame
+Preferred-Languages: pt-BR, en
+Canonical: https://dashboardfinanceiro.com/.well-known/security.txt
+Policy: https://dashboardfinanceiro.com/security-policy 

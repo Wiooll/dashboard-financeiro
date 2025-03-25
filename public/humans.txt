@@ -1,0 +1,21 @@
+/* TEAM */
+Developer: Seu Nome
+Contact: email@exemplo.com
+Twitter: @seu_twitter
+From: Sua Cidade, Seu Estado, Brasil
+
+/* THANKS */
+Name: React Team
+Website: https://reactjs.org
+
+Name: Material-UI Team
+Website: https://mui.com
+
+Name: Tailwind CSS Team
+Website: https://tailwindcss.com
+
+/* SITE */
+Last update: 2024/02/20
+Standards: HTML5, CSS3, JavaScript
+Components: React, Material-UI, Tailwind CSS, Chart.js
+Software: Visual Studio Code, Git 
