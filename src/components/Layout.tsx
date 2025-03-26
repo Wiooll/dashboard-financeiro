@@ -49,7 +49,6 @@ const menuItems = [
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
-  const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
 

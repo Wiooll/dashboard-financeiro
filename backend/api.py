@@ -139,16 +139,47 @@ async def delete_transaction(transaction_id: int):
     finally:
         conn.close()
 
+@app.get("/test")
+async def test_connection():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = cursor.fetchall()
+        conn.close()
+        return {
+            "status": "ok",
+            "message": "Conexão com o banco de dados estabelecida",
+            "tables": [table['name'] for table in tables]
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
 @app.get("/profile")
 async def get_profile():
-    conn = get_db_connection()
     try:
+        conn = get_db_connection()
         cursor = conn.cursor()
+        
+        # Verificar se a tabela profiles existe
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='profiles'")
+        if not cursor.fetchone():
+            raise HTTPException(status_code=500, detail="Tabela profiles não encontrada")
+            
         cursor.execute("SELECT * FROM profiles LIMIT 1")
         profile = cursor.fetchone()
         
         if not profile:
-            raise HTTPException(status_code=404, detail="Perfil não encontrado")
+            return {
+                "id": None,
+                "name": "",
+                "email": "",
+                "familyName": "",
+                "members": []
+            }
             
         cursor.execute("SELECT * FROM family_members WHERE profile_id = ?", (profile['id'],))
         members = cursor.fetchall()
@@ -168,8 +199,15 @@ async def get_profile():
                 for member in members
             ]
         }
+    except sqlite3.Error as e:
+        print(f"Erro SQLite: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        print(f"Erro geral: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
-        conn.close()
+        if 'conn' in locals():
+            conn.close()
 
 @app.post("/profile")
 async def create_profile(profile: Profile):
@@ -182,7 +220,20 @@ async def create_profile(profile: Profile):
         """, (profile.name, profile.email, profile.familyName))
         conn.commit()
         new_id = cursor.lastrowid
-        return {"id": new_id, "message": "Perfil criado com sucesso"}
+        
+        # Retornar o perfil completo
+        cursor.execute("SELECT * FROM profiles WHERE id = ?", (new_id,))
+        new_profile = cursor.fetchone()
+        
+        return {
+            "id": new_profile['id'],
+            "name": new_profile['name'],
+            "email": new_profile['email'],
+            "familyName": new_profile['family_name'],
+            "members": []
+        }
+    except sqlite3.Error as e:
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
 
@@ -197,7 +248,34 @@ async def update_profile(profile: Profile):
             WHERE id = ?
         """, (profile.name, profile.email, profile.familyName, profile.id))
         conn.commit()
-        return {"message": "Perfil atualizado com sucesso"}
+        
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Perfil não encontrado")
+            
+        # Retornar o perfil atualizado
+        cursor.execute("SELECT * FROM profiles WHERE id = ?", (profile.id,))
+        updated_profile = cursor.fetchone()
+        
+        cursor.execute("SELECT * FROM family_members WHERE profile_id = ?", (profile.id,))
+        members = cursor.fetchall()
+        
+        return {
+            "id": updated_profile['id'],
+            "name": updated_profile['name'],
+            "email": updated_profile['email'],
+            "familyName": updated_profile['family_name'],
+            "members": [
+                {
+                    "id": member['id'],
+                    "name": member['name'],
+                    "email": member['email'],
+                    "accessLevel": member['access_level']
+                }
+                for member in members
+            ]
+        }
+    except sqlite3.Error as e:
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
 
@@ -206,13 +284,32 @@ async def add_family_member(member: FamilyMember):
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
+        # Primeiro, buscar o ID do perfil atual
+        cursor.execute("SELECT id FROM profiles LIMIT 1")
+        profile = cursor.fetchone()
+        
+        if not profile:
+            raise HTTPException(status_code=404, detail="Perfil não encontrado")
+            
         cursor.execute("""
             INSERT INTO family_members (profile_id, name, email, access_level)
             VALUES (?, ?, ?, ?)
-        """, (member.id, member.name, member.email, member.accessLevel))
+        """, (profile['id'], member.name, member.email, member.accessLevel))
         conn.commit()
         new_id = cursor.lastrowid
-        return {"id": new_id, "message": "Membro adicionado com sucesso"}
+        
+        # Retornar o membro criado
+        cursor.execute("SELECT * FROM family_members WHERE id = ?", (new_id,))
+        new_member = cursor.fetchone()
+        
+        return {
+            "id": new_member['id'],
+            "name": new_member['name'],
+            "email": new_member['email'],
+            "accessLevel": new_member['access_level']
+        }
+    except sqlite3.Error as e:
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
 
@@ -227,7 +324,22 @@ async def update_family_member(member_id: int, member: FamilyMember):
             WHERE id = ?
         """, (member.name, member.email, member.accessLevel, member_id))
         conn.commit()
-        return {"message": "Membro atualizado com sucesso"}
+        
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Membro não encontrado")
+            
+        # Retornar o membro atualizado
+        cursor.execute("SELECT * FROM family_members WHERE id = ?", (member_id,))
+        updated_member = cursor.fetchone()
+        
+        return {
+            "id": updated_member['id'],
+            "name": updated_member['name'],
+            "email": updated_member['email'],
+            "accessLevel": updated_member['access_level']
+        }
+    except sqlite3.Error as e:
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
 
@@ -238,6 +350,12 @@ async def delete_family_member(member_id: int):
         cursor = conn.cursor()
         cursor.execute("DELETE FROM family_members WHERE id = ?", (member_id,))
         conn.commit()
+        
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Membro não encontrado")
+            
         return {"message": "Membro excluído com sucesso"}
+    except sqlite3.Error as e:
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close() 

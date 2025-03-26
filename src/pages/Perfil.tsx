@@ -96,7 +96,7 @@ const Perfil: React.FC = () => {
     setOpenDialog(true);
   };
 
-  if (!profile) {
+  if (!profile || !profile.id) {
     return (
       <Box className="space-y-6">
         <Typography variant="h4" className="text-gray-800 mb-6">
