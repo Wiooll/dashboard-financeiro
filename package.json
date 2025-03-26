@@ -10,10 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@emotion/react": "^11.11.3",
-    "@emotion/styled": "^11.11.0",
-    "@mui/icons-material": "^5.15.10",
-    "@mui/material": "^5.15.10",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/icons-material": "^5.17.1",
+    "@mui/material": "^5.17.1",
+    "axios": "^1.8.4",
     "chart.js": "^4.4.1",
     "react": "^18.2.0",
     "react-chartjs-2": "^5.2.0",
@@ -21,6 +22,7 @@
     "react-router-dom": "^6.22.1"
   },
   "devDependencies": {
+    "@types/node": "^22.13.13",
     "@types/react": "^18.2.55",
     "@types/react-dom": "^18.2.19",
     "@typescript-eslint/eslint-plugin": "^6.21.0",

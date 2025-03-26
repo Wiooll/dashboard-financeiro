@@ -59,6 +59,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const handleThemeChange = () => {
     setDarkMode(!darkMode);
     // Aqui você pode implementar a lógica para mudar o tema
+    document.documentElement.classList.toggle('dark', darkMode);
+    localStorage.setItem('theme', darkMode ? 'dark' : 'light');
+    window.location.reload();    
   };
 
   const drawer = (

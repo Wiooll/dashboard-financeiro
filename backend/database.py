@@ -46,30 +46,15 @@ def init_db():
     )
     ''')
     
-    # Inserir algumas categorias padrão
-    default_categories = [
-        ('Salário', 'income'),
-        ('Investimentos', 'income'),
-        ('Alimentação', 'expense'),
-        ('Transporte', 'expense'),
-        ('Moradia', 'expense'),
-        ('Saúde', 'expense'),
-        ('Educação', 'expense'),
-        ('Lazer', 'expense'),
-        ('Outros', 'expense')
-    ]
-    
-    cursor.executemany('''
-    INSERT OR IGNORE INTO categories (name, type)
-    VALUES (?, ?)
-    ''', default_categories)
-    
     conn.commit()
     conn.close()
 
 def get_db_connection():
     """Retorna uma conexão com o banco de dados."""
-    return sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH)
+    # Configurar para retornar dicionários ao invés de tuplas
+    conn.row_factory = sqlite3.Row
+    return conn
 
 if __name__ == "__main__":
     init_db()

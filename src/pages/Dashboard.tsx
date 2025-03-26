@@ -57,10 +57,6 @@ const Dashboard: React.FC = () => {
   };
 
   const calcularTotais = () => {
-    if (!Array.isArray(transactions)) {
-      return { receitas: 0, despesas: 0, saldoTotal: 0 };
-    }
-
     const receitas = transactions
       .filter(t => t.type === 'income')
       .reduce((acc, curr) => acc + curr.amount, 0);

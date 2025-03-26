@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -33,99 +33,82 @@ import {
   Delete as DeleteIcon,
   Edit as EditIcon,
 } from '@mui/icons-material';
-
-interface Receita {
-  id: number;
-  descricao: string;
-  valor: number;
-  categoria: string;
-  data: string;
-  recorrente: boolean;
-  membro: string;
-}
-
-const categorias = [
-  'Salário',
-  'Freelance',
-  'Investimentos',
-  'Aluguéis',
-  'Outros',
-];
-
-const membros = ['João Silva', 'Maria Silva'];
+import { transactionService, Transaction } from '../services/api';
 
 const Receitas: React.FC = () => {
-  const [receitas, setReceitas] = useState<Receita[]>([
-    {
-      id: 1,
-      descricao: 'Salário',
-      valor: 5000,
-      categoria: 'Salário',
-      data: '2024-03-15',
-      recorrente: true,
-      membro: 'João Silva',
-    },
-    {
-      id: 2,
-      descricao: 'Freelance',
-      valor: 1500,
-      categoria: 'Freelance',
-      data: '2024-03-20',
-      recorrente: false,
-      membro: 'Maria Silva',
-    },
-  ]);
-
+  const [receitas, setReceitas] = useState<Transaction[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
-  const [novaReceita, setNovaReceita] = useState<Partial<Receita>>({
-    descricao: '',
-    valor: 0,
-    categoria: '',
-    data: new Date().toISOString().split('T')[0],
-    recorrente: false,
-    membro: '',
+  const [editingReceita, setEditingReceita] = useState<Transaction | null>(null);
+  const [formData, setFormData] = useState<Transaction>({
+    date: '',
+    description: '',
+    amount: 0,
+    category: '',
+    type: 'income'
   });
 
+  useEffect(() => {
+    loadReceitas();
+  }, []);
+
+  const loadReceitas = async () => {
+    try {
+      const transactions = await transactionService.getAll();
+      setReceitas(transactions.filter(t => t.type === 'income'));
+    } catch (error) {
+      console.error('Erro ao carregar receitas:', error);
+    }
+  };
+
   const handleOpenDialog = () => {
+    setEditingReceita(null);
+    setFormData({
+      date: '',
+      description: '',
+      amount: 0,
+      category: '',
+      type: 'income'
+    });
     setOpenDialog(true);
   };
 
   const handleCloseDialog = () => {
     setOpenDialog(false);
-    setNovaReceita({
-      descricao: '',
-      valor: 0,
-      categoria: '',
-      data: new Date().toISOString().split('T')[0],
-      recorrente: false,
-      membro: '',
-    });
+    setEditingReceita(null);
   };
 
-  const handleAddReceita = () => {
-    if (novaReceita.descricao && novaReceita.valor && novaReceita.categoria && novaReceita.membro) {
-      const novoId = Math.max(...receitas.map(r => r.id)) + 1;
-      setReceitas([
-        ...receitas,
-        {
-          id: novoId,
-          descricao: novaReceita.descricao,
-          valor: novaReceita.valor,
-          categoria: novaReceita.categoria,
-          data: novaReceita.data || new Date().toISOString().split('T')[0],
-          recorrente: novaReceita.recorrente || false,
-          membro: novaReceita.membro,
-        },
-      ]);
+  const handleSave = async () => {
+    try {
+      if (editingReceita?.id) {
+        await transactionService.update(editingReceita.id, formData);
+      } else {
+        await transactionService.create(formData);
+      }
       handleCloseDialog();
+      loadReceitas();
+    } catch (error) {
+      console.error('Erro ao salvar receita:', error);
     }
   };
 
-  const handleDeleteReceita = (id: number) => {
-    setReceitas(receitas.filter(receita => receita.id !== id));
+  const handleDelete = async (id: number) => {
+    if (window.confirm('Tem certeza que deseja excluir esta receita?')) {
+      try {
+        await transactionService.delete(id);
+        loadReceitas();
+      } catch (error) {
+        console.error('Erro ao excluir receita:', error);
+      }
+    }
   };
 
-  const totalReceitas = receitas.reduce((acc, receita) => acc + receita.valor, 0);
+  const handleEdit = (receita: Transaction) => {
+    setEditingReceita(receita);
+    setFormData(receita);
+    setOpenDialog(true);
+  };
+
+  const totalReceitas = receitas.reduce((acc, receita) => acc + receita.amount, 0);
 
   return (
     <Box className="space-y-6">
@@ -168,8 +151,8 @@ const Receitas: React.FC = () => {
                   </Typography>
                   <Typography variant="h4" className="text-blue-600">
                     R$ {receitas
-                      .filter(r => r.recorrente)
-                      .reduce((acc, r) => acc + r.valor, 0)
+                      .filter(r => r.type === 'income')
+                      .reduce((acc, r) => acc + r.amount, 0)
                       .toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </Typography>
                 </Box>
@@ -181,8 +164,8 @@ const Receitas: React.FC = () => {
                   </Typography>
                   <Typography variant="h4" className="text-purple-600">
                     R$ {receitas
-                      .filter(r => !r.recorrente)
-                      .reduce((acc, r) => acc + r.valor, 0)
+                      .filter(r => r.type === 'income')
+                      .reduce((acc, r) => acc + r.amount, 0)
                       .toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </Typography>
                 </Box>
@@ -201,30 +184,21 @@ const Receitas: React.FC = () => {
                   <TableCell>Descrição</TableCell>
                   <TableCell>Categoria</TableCell>
                   <TableCell>Valor</TableCell>
-                  <TableCell>Membro</TableCell>
-                  <TableCell>Recorrente</TableCell>
                   <TableCell>Ações</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {receitas.map((receita) => (
                   <TableRow key={receita.id}>
-                    <TableCell>{new Date(receita.data).toLocaleDateString('pt-BR')}</TableCell>
-                    <TableCell>{receita.descricao}</TableCell>
-                    <TableCell>{receita.categoria}</TableCell>
+                    <TableCell>{receita.date}</TableCell>
+                    <TableCell>{receita.description}</TableCell>
+                    <TableCell>{receita.category}</TableCell>
+                    <TableCell>R$ {receita.amount.toFixed(2)}</TableCell>
                     <TableCell>
-                      R$ {receita.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </TableCell>
-                    <TableCell>{receita.membro}</TableCell>
-                    <TableCell>{receita.recorrente ? 'Sim' : 'Não'}</TableCell>
-                    <TableCell>
-                      <IconButton size="small">
+                      <IconButton onClick={() => handleEdit(receita)}>
                         <EditIcon />
                       </IconButton>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleDeleteReceita(receita.id)}
-                      >
+                      <IconButton onClick={() => receita.id && handleDelete(receita.id)}>
                         <DeleteIcon />
                       </IconButton>
                     </TableCell>
@@ -238,73 +212,52 @@ const Receitas: React.FC = () => {
 
       {/* Dialog para adicionar receita */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>Nova Receita</DialogTitle>
+        <DialogTitle>
+          {editingReceita ? 'Editar Receita' : 'Nova Receita'}
+        </DialogTitle>
         <DialogContent>
-          <Box className="space-y-4 mt-2">
-            <TextField
-              fullWidth
-              label="Descrição"
-              value={novaReceita.descricao}
-              onChange={(e) => setNovaReceita({ ...novaReceita, descricao: e.target.value })}
-            />
-            <TextField
-              fullWidth
-              label="Valor"
-              type="number"
-              value={novaReceita.valor}
-              onChange={(e) => setNovaReceita({ ...novaReceita, valor: Number(e.target.value) })}
-            />
-            <FormControl fullWidth>
-              <InputLabel>Categoria</InputLabel>
-              <Select
-                value={novaReceita.categoria}
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Data"
+                type="date"
+                value={formData.date}
+                onChange={(e) => setFormData({...formData, date: e.target.value})}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Descrição"
+                value={formData.description}
+                onChange={(e) => setFormData({...formData, description: e.target.value})}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Valor"
+                type="number"
+                value={formData.amount}
+                onChange={(e) => setFormData({...formData, amount: Number(e.target.value)})}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
                 label="Categoria"
-                onChange={(e) => setNovaReceita({ ...novaReceita, categoria: e.target.value })}
-              >
-                {categorias.map((categoria) => (
-                  <MenuItem key={categoria} value={categoria}>
-                    {categoria}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <TextField
-              fullWidth
-              label="Data"
-              type="date"
-              value={novaReceita.data}
-              onChange={(e) => setNovaReceita({ ...novaReceita, data: e.target.value })}
-              InputLabelProps={{ shrink: true }}
-            />
-            <FormControl fullWidth>
-              <InputLabel>Membro</InputLabel>
-              <Select
-                value={novaReceita.membro}
-                label="Membro"
-                onChange={(e) => setNovaReceita({ ...novaReceita, membro: e.target.value })}
-              >
-                {membros.map((membro) => (
-                  <MenuItem key={membro} value={membro}>
-                    {membro}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={novaReceita.recorrente}
-                  onChange={(e) => setNovaReceita({ ...novaReceita, recorrente: e.target.checked })}
-                />
-              }
-              label="Receita Recorrente"
-            />
-          </Box>
+                value={formData.category}
+                onChange={(e) => setFormData({...formData, category: e.target.value})}
+              />
+            </Grid>
+          </Grid>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog}>Cancelar</Button>
-          <Button onClick={handleAddReceita} variant="contained" color="primary">
-            Adicionar
+          <Button onClick={handleSave} variant="contained" color="primary">
+            Salvar
           </Button>
         </DialogActions>
       </Dialog>

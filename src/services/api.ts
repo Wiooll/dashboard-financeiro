@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: 'http://localhost:8001',
+    baseURL: '/api',
 });
 
 export interface Transaction {
@@ -17,10 +17,10 @@ export const transactionService = {
     getAll: async (): Promise<Transaction[]> => {
         try {
             const response = await api.get<Transaction[]>('/transactions');
-            return Array.isArray(response.data) ? response.data : [];
+            return response.data;
         } catch (error) {
             console.error('Erro ao buscar transações:', error);
-            return [];
+            throw error;
         }
     },
 
