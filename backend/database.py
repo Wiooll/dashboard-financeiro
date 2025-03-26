@@ -22,12 +22,27 @@ def init_db():
     )
     ''')
     
-    # Criar tabela de categorias
+    # Criar tabela de perfis
     cursor.execute('''
-    CREATE TABLE IF NOT EXISTS categories (
+    CREATE TABLE IF NOT EXISTS profiles (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL UNIQUE,
-        type TEXT NOT NULL
+        name TEXT NOT NULL,
+        email TEXT NOT NULL UNIQUE,
+        family_name TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+    
+    # Criar tabela de membros da família
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS family_members (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        profile_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        email TEXT NOT NULL UNIQUE,
+        access_level TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (profile_id) REFERENCES profiles (id)
     )
     ''')
     

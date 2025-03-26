@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -25,69 +25,107 @@ import {
   Delete as DeleteIcon,
   Edit as EditIcon,
 } from '@mui/icons-material';
-
-interface MembroFamilia {
-  id: number;
-  nome: string;
-  email: string;
-  nivelAcesso: 'admin' | 'visualizador';
-}
+import { profileService, Profile, FamilyMember } from '../services/profileService';
 
 const Perfil: React.FC = () => {
-  const [membros, setMembros] = useState<MembroFamilia[]>([
-    {
-      id: 1,
-      nome: 'João Silva',
-      email: 'joao@email.com',
-      nivelAcesso: 'admin',
-    },
-    {
-      id: 2,
-      nome: 'Maria Silva',
-      email: 'maria@email.com',
-      nivelAcesso: 'visualizador',
-    },
-  ]);
-
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
-  const [novoMembro, setNovoMembro] = useState<Partial<MembroFamilia>>({
-    nome: '',
+  const [editingMember, setEditingMember] = useState<FamilyMember | null>(null);
+  const [formData, setFormData] = useState<Partial<FamilyMember>>({
+    name: '',
     email: '',
-    nivelAcesso: 'visualizador',
+    accessLevel: 'viewer',
   });
 
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const loadProfile = async () => {
+    try {
+      const data = await profileService.getProfile();
+      setProfile(data);
+    } catch (error) {
+      console.error('Erro ao carregar perfil:', error);
+    }
+  };
+
   const handleOpenDialog = () => {
+    setEditingMember(null);
+    setFormData({
+      name: '',
+      email: '',
+      accessLevel: 'viewer',
+    });
     setOpenDialog(true);
   };
 
   const handleCloseDialog = () => {
     setOpenDialog(false);
-    setNovoMembro({
-      nome: '',
-      email: '',
-      nivelAcesso: 'visualizador',
-    });
+    setEditingMember(null);
   };
 
-  const handleAddMembro = () => {
-    if (novoMembro.nome && novoMembro.email) {
-      const novoId = Math.max(...membros.map(m => m.id)) + 1;
-      setMembros([
-        ...membros,
-        {
-          id: novoId,
-          nome: novoMembro.nome,
-          email: novoMembro.email,
-          nivelAcesso: novoMembro.nivelAcesso as 'admin' | 'visualizador',
-        },
-      ]);
+  const handleSave = async () => {
+    try {
+      if (editingMember?.id) {
+        await profileService.updateFamilyMember(editingMember.id, formData as FamilyMember);
+      } else {
+        await profileService.addFamilyMember(formData as FamilyMember);
+      }
       handleCloseDialog();
+      loadProfile();
+    } catch (error) {
+      console.error('Erro ao salvar membro:', error);
     }
   };
 
-  const handleDeleteMembro = (id: number) => {
-    setMembros(membros.filter(membro => membro.id !== id));
+  const handleDelete = async (id: number) => {
+    if (window.confirm('Tem certeza que deseja excluir este membro?')) {
+      try {
+        await profileService.deleteFamilyMember(id);
+        loadProfile();
+      } catch (error) {
+        console.error('Erro ao excluir membro:', error);
+      }
+    }
   };
+
+  const handleEdit = (member: FamilyMember) => {
+    setEditingMember(member);
+    setFormData(member);
+    setOpenDialog(true);
+  };
+
+  if (!profile) {
+    return (
+      <Box className="space-y-6">
+        <Typography variant="h4" className="text-gray-800 mb-6">
+          Configurações do Perfil
+        </Typography>
+        <Paper className="p-4">
+          <Typography variant="h6" className="mb-4">
+            Bem-vindo! Crie seu perfil para começar.
+          </Typography>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => {
+              const defaultProfile = {
+                name: "Meu Perfil",
+                email: "meu@email.com",
+                familyName: "Minha Família"
+              };
+              profileService.createProfile(defaultProfile).then(() => {
+                loadProfile();
+              });
+            }}
+          >
+            Criar Perfil
+          </Button>
+        </Paper>
+      </Box>
+    );
+  }
 
   return (
     <Box className="space-y-6">
@@ -96,39 +134,51 @@ const Perfil: React.FC = () => {
       </Typography>
 
       <Grid container spacing={3}>
-        {/* Informações da Família */}
+        {/* Informações do Perfil */}
         <Grid item xs={12} md={6}>
           <Paper className="p-4">
             <Typography variant="h6" className="mb-4">
-              Informações da Família
+              Informações do Perfil
             </Typography>
-            <Box className="space-y-4">
-              <TextField
-                fullWidth
-                label="Nome da Família"
-                defaultValue="Família Silva"
-              />
-              <TextField
-                fullWidth
-                label="Endereço"
-                defaultValue="Rua das Flores, 123"
-              />
-              <Button variant="contained" color="primary">
-                Salvar Alterações
-              </Button>
-            </Box>
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Nome"
+                  value={profile.name}
+                  disabled
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Email"
+                  value={profile.email}
+                  disabled
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Nome da Família"
+                  value={profile.familyName}
+                  disabled
+                />
+              </Grid>
+            </Grid>
           </Paper>
         </Grid>
 
-        {/* Membros da Família */}
+        {/* Lista de Membros */}
         <Grid item xs={12} md={6}>
           <Paper className="p-4">
-            <Box className="flex justify-between items-center mb-4">
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
               <Typography variant="h6">
                 Membros da Família
               </Typography>
               <Button
                 variant="contained"
+                color="primary"
                 startIcon={<AddIcon />}
                 onClick={handleOpenDialog}
               >
@@ -136,21 +186,17 @@ const Perfil: React.FC = () => {
               </Button>
             </Box>
             <List>
-              {membros.map((membro) => (
-                <ListItem key={membro.id}>
+              {profile.members?.map((member) => (
+                <ListItem key={member.id}>
                   <ListItemText
-                    primary={membro.nome}
-                    secondary={`${membro.email} - ${membro.nivelAcesso}`}
+                    primary={member.name}
+                    secondary={`${member.email} - ${member.accessLevel}`}
                   />
                   <ListItemSecondaryAction>
-                    <IconButton edge="end" aria-label="edit">
+                    <IconButton onClick={() => handleEdit(member)}>
                       <EditIcon />
                     </IconButton>
-                    <IconButton
-                      edge="end"
-                      aria-label="delete"
-                      onClick={() => handleDeleteMembro(membro.id)}
-                    >
+                    <IconButton onClick={() => member.id && handleDelete(member.id)}>
                       <DeleteIcon />
                     </IconButton>
                   </ListItemSecondaryAction>
@@ -161,41 +207,47 @@ const Perfil: React.FC = () => {
         </Grid>
       </Grid>
 
-      {/* Dialog para adicionar membro */}
+      {/* Dialog para adicionar/editar membro */}
       <Dialog open={openDialog} onClose={handleCloseDialog}>
-        <DialogTitle>Adicionar Membro da Família</DialogTitle>
+        <DialogTitle>
+          {editingMember ? 'Editar Membro' : 'Novo Membro'}
+        </DialogTitle>
         <DialogContent>
-          <Box className="space-y-4 mt-2">
-            <TextField
-              fullWidth
-              label="Nome"
-              value={novoMembro.nome}
-              onChange={(e) => setNovoMembro({ ...novoMembro, nome: e.target.value })}
-            />
-            <TextField
-              fullWidth
-              label="Email"
-              type="email"
-              value={novoMembro.email}
-              onChange={(e) => setNovoMembro({ ...novoMembro, email: e.target.value })}
-            />
-            <FormControl fullWidth>
-              <InputLabel>Nível de Acesso</InputLabel>
-              <Select
-                value={novoMembro.nivelAcesso}
-                label="Nível de Acesso"
-                onChange={(e) => setNovoMembro({ ...novoMembro, nivelAcesso: e.target.value as 'admin' | 'visualizador' })}
-              >
-                <MenuItem value="admin">Administrador</MenuItem>
-                <MenuItem value="visualizador">Visualizador</MenuItem>
-              </Select>
-            </FormControl>
-          </Box>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Nome"
+                value={formData.name}
+                onChange={(e) => setFormData({...formData, name: e.target.value})}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Email"
+                value={formData.email}
+                onChange={(e) => setFormData({...formData, email: e.target.value})}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Nível de Acesso</InputLabel>
+                <Select
+                  value={formData.accessLevel}
+                  onChange={(e) => setFormData({...formData, accessLevel: e.target.value as 'admin' | 'viewer'})}
+                >
+                  <MenuItem value="admin">Administrador</MenuItem>
+                  <MenuItem value="viewer">Visualizador</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog}>Cancelar</Button>
-          <Button onClick={handleAddMembro} variant="contained" color="primary">
-            Adicionar
+          <Button onClick={handleSave} variant="contained" color="primary">
+            Salvar
           </Button>
         </DialogActions>
       </Dialog>
