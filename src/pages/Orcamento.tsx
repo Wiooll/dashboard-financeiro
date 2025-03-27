@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -23,6 +23,7 @@ import {
   TableRow,
   LinearProgress,
   Alert,
+  CircularProgress,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -30,14 +31,7 @@ import {
   Edit as EditIcon,
   Warning as WarningIcon,
 } from '@mui/icons-material';
-
-interface CategoriaOrcamento {
-  id: number;
-  categoria: string;
-  limite: number;
-  gasto: number;
-  alerta: number;
-}
+import { budgetService, BudgetCategory } from '../services/budgetService';
 
 const categorias = [
   'Moradia',
@@ -52,29 +46,32 @@ const categorias = [
 ];
 
 const Orcamento: React.FC = () => {
-  const [categoriasOrcamento, setCategoriasOrcamento] = useState<CategoriaOrcamento[]>([
-    {
-      id: 1,
-      categoria: 'Moradia',
-      limite: 3000,
-      gasto: 2500,
-      alerta: 2700,
-    },
-    {
-      id: 2,
-      categoria: 'Alimentação',
-      limite: 2000,
-      gasto: 1800,
-      alerta: 1900,
-    },
-  ]);
-
+  const [categoriasOrcamento, setCategoriasOrcamento] = useState<BudgetCategory[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
-  const [novaCategoria, setNovaCategoria] = useState<Partial<CategoriaOrcamento>>({
-    categoria: '',
-    limite: 0,
-    alerta: 0,
+  const [novaCategoria, setNovaCategoria] = useState<Partial<BudgetCategory>>({
+    category: '',
+    limit: 0,
+    alert: 0,
   });
+
+  useEffect(() => {
+    loadCategorias();
+  }, []);
+
+  const loadCategorias = async () => {
+    try {
+      setLoading(true);
+      const data = await budgetService.getAll();
+      setCategoriasOrcamento(data);
+    } catch (error) {
+      setError('Erro ao carregar categorias de orçamento');
+      console.error('Erro:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleOpenDialog = () => {
     setOpenDialog(true);
@@ -83,31 +80,40 @@ const Orcamento: React.FC = () => {
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setNovaCategoria({
-      categoria: '',
-      limite: 0,
-      alerta: 0,
+      category: '',
+      limit: 0,
+      alert: 0,
     });
   };
 
-  const handleAddCategoria = () => {
-    if (novaCategoria.categoria && novaCategoria.limite && novaCategoria.alerta) {
-      const novoId = Math.max(...categoriasOrcamento.map(c => c.id)) + 1;
-      setCategoriasOrcamento([
-        ...categoriasOrcamento,
-        {
-          id: novoId,
-          categoria: novaCategoria.categoria,
-          limite: novaCategoria.limite,
-          gasto: 0,
-          alerta: novaCategoria.alerta,
-        },
-      ]);
-      handleCloseDialog();
+  const handleAddCategoria = async () => {
+    if (novaCategoria.category && novaCategoria.limit && novaCategoria.alert) {
+      try {
+        await budgetService.create({
+          category: novaCategoria.category,
+          limit: novaCategoria.limit,
+          spent: 0,
+          alert: novaCategoria.alert,
+        });
+        handleCloseDialog();
+        loadCategorias();
+      } catch (error) {
+        setError('Erro ao criar categoria');
+        console.error('Erro:', error);
+      }
     }
   };
 
-  const handleDeleteCategoria = (id: number) => {
-    setCategoriasOrcamento(categoriasOrcamento.filter(categoria => categoria.id !== id));
+  const handleDeleteCategoria = async (id: number) => {
+    if (window.confirm('Tem certeza que deseja excluir esta categoria?')) {
+      try {
+        await budgetService.delete(id);
+        loadCategorias();
+      } catch (error) {
+        setError('Erro ao excluir categoria');
+        console.error('Erro:', error);
+      }
+    }
   };
 
   const calcularProgresso = (gasto: number, limite: number) => {
@@ -120,8 +126,24 @@ const Orcamento: React.FC = () => {
     return 'success';
   };
 
-  const totalLimite = categoriasOrcamento.reduce((acc, cat) => acc + cat.limite, 0);
-  const totalGasto = categoriasOrcamento.reduce((acc, cat) => acc + cat.gasto, 0);
+  const totalLimite = categoriasOrcamento.reduce((acc, cat) => acc + cat.limit, 0);
+  const totalGasto = categoriasOrcamento.reduce((acc, cat) => acc + cat.spent, 0);
+
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box p={3}>
+        <Alert severity="error">{error}</Alert>
+      </Box>
+    );
+  }
 
   return (
     <Box className="space-y-6">
@@ -197,15 +219,15 @@ const Orcamento: React.FC = () => {
               </TableHead>
               <TableBody>
                 {categoriasOrcamento.map((categoria) => {
-                  const progresso = calcularProgresso(categoria.gasto, categoria.limite);
+                  const progresso = calcularProgresso(categoria.spent, categoria.limit);
                   return (
                     <TableRow key={categoria.id}>
-                      <TableCell>{categoria.categoria}</TableCell>
+                      <TableCell>{categoria.category}</TableCell>
                       <TableCell>
-                        R$ {categoria.limite.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        R$ {categoria.limit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </TableCell>
                       <TableCell>
-                        R$ {categoria.gasto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        R$ {categoria.spent.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </TableCell>
                       <TableCell>
                         <Box className="w-full">
@@ -221,7 +243,7 @@ const Orcamento: React.FC = () => {
                         </Box>
                       </TableCell>
                       <TableCell>
-                        R$ {categoria.alerta.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        R$ {categoria.alert.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </TableCell>
                       <TableCell>
                         <IconButton size="small">
@@ -229,7 +251,7 @@ const Orcamento: React.FC = () => {
                         </IconButton>
                         <IconButton
                           size="small"
-                          onClick={() => handleDeleteCategoria(categoria.id)}
+                          onClick={() => categoria.id && handleDeleteCategoria(categoria.id)}
                         >
                           <DeleteIcon />
                         </IconButton>
@@ -249,7 +271,7 @@ const Orcamento: React.FC = () => {
               Alertas de Orçamento
             </Typography>
             {categoriasOrcamento
-              .filter(cat => cat.gasto >= cat.alerta)
+              .filter(cat => cat.spent >= cat.alert)
               .map(categoria => (
                 <Alert
                   key={categoria.id}
@@ -257,8 +279,8 @@ const Orcamento: React.FC = () => {
                   icon={<WarningIcon />}
                   className="mb-2"
                 >
-                  A categoria {categoria.categoria} está próxima do limite de alerta!
-                  Gasto: R$ {categoria.gasto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  A categoria {categoria.category} está próxima do limite de alerta!
+                  Gasto: R$ {categoria.spent.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </Alert>
               ))}
           </Paper>
@@ -273,9 +295,9 @@ const Orcamento: React.FC = () => {
             <FormControl fullWidth>
               <InputLabel>Categoria</InputLabel>
               <Select
-                value={novaCategoria.categoria}
+                value={novaCategoria.category}
                 label="Categoria"
-                onChange={(e) => setNovaCategoria({ ...novaCategoria, categoria: e.target.value })}
+                onChange={(e) => setNovaCategoria({ ...novaCategoria, category: e.target.value })}
               >
                 {categorias.map((categoria) => (
                   <MenuItem key={categoria} value={categoria}>
@@ -288,15 +310,15 @@ const Orcamento: React.FC = () => {
               fullWidth
               label="Limite Mensal"
               type="number"
-              value={novaCategoria.limite}
-              onChange={(e) => setNovaCategoria({ ...novaCategoria, limite: Number(e.target.value) })}
+              value={novaCategoria.limit}
+              onChange={(e) => setNovaCategoria({ ...novaCategoria, limit: Number(e.target.value) })}
             />
             <TextField
               fullWidth
               label="Valor de Alerta"
               type="number"
-              value={novaCategoria.alerta}
-              onChange={(e) => setNovaCategoria({ ...novaCategoria, alerta: Number(e.target.value) })}
+              value={novaCategoria.alert}
+              onChange={(e) => setNovaCategoria({ ...novaCategoria, alert: Number(e.target.value) })}
             />
           </Box>
         </DialogContent>

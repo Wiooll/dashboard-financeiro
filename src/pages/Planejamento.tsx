@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -31,46 +31,36 @@ import {
   Edit as EditIcon,
   TrendingUp as TrendingUpIcon,
 } from '@mui/icons-material';
-
-interface Meta {
-  id: number;
-  descricao: string;
-  valor: number;
-  valorAtual: number;
-  prazo: string;
-  categoria: 'curto' | 'medio' | 'longo';
-}
+import { planningService, FinancialGoal } from '../services/planningService';
 
 const categorias = ['curto', 'medio', 'longo'];
 
 const Planejamento: React.FC = () => {
-  const [metas, setMetas] = useState<Meta[]>([
-    {
-      id: 1,
-      descricao: 'Reserva de Emergência',
-      valor: 10000,
-      valorAtual: 5000,
-      prazo: '2024-12-31',
-      categoria: 'curto',
-    },
-    {
-      id: 2,
-      descricao: 'Entrada do Apartamento',
-      valor: 50000,
-      valorAtual: 20000,
-      prazo: '2025-12-31',
-      categoria: 'medio',
-    },
-  ]);
-
+  const [metas, setMetas] = useState<FinancialGoal[]>([]);
+  const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
-  const [novaMeta, setNovaMeta] = useState<Partial<Meta>>({
-    descricao: '',
-    valor: 0,
-    valorAtual: 0,
-    prazo: '',
-    categoria: 'curto',
+  const [novaMeta, setNovaMeta] = useState<Partial<FinancialGoal>>({
+    description: '',
+    targetValue: 0,
+    currentValue: 0,
+    deadline: '',
+    category: 'curto',
   });
+
+  useEffect(() => {
+    loadMetas();
+  }, []);
+
+  const loadMetas = async () => {
+    try {
+      const data = await planningService.getAll();
+      setMetas(data);
+    } catch (error) {
+      console.error('Erro ao carregar metas:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleOpenDialog = () => {
     setOpenDialog(true);
@@ -79,34 +69,33 @@ const Planejamento: React.FC = () => {
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setNovaMeta({
-      descricao: '',
-      valor: 0,
-      valorAtual: 0,
-      prazo: '',
-      categoria: 'curto',
+      description: '',
+      targetValue: 0,
+      currentValue: 0,
+      deadline: '',
+      category: 'curto',
     });
   };
 
-  const handleAddMeta = () => {
-    if (novaMeta.descricao && novaMeta.valor && novaMeta.prazo && novaMeta.categoria) {
-      const novoId = Math.max(...metas.map(m => m.id)) + 1;
-      setMetas([
-        ...metas,
-        {
-          id: novoId,
-          descricao: novaMeta.descricao,
-          valor: novaMeta.valor,
-          valorAtual: novaMeta.valorAtual || 0,
-          prazo: novaMeta.prazo,
-          categoria: novaMeta.categoria as 'curto' | 'medio' | 'longo',
-        },
-      ]);
-      handleCloseDialog();
+  const handleAddMeta = async () => {
+    if (novaMeta.description && novaMeta.targetValue && novaMeta.deadline && novaMeta.category) {
+      try {
+        const meta = await planningService.create(novaMeta as Omit<FinancialGoal, 'id'>);
+        setMetas([...metas, meta]);
+        handleCloseDialog();
+      } catch (error) {
+        console.error('Erro ao criar meta:', error);
+      }
     }
   };
 
-  const handleDeleteMeta = (id: number) => {
-    setMetas(metas.filter(meta => meta.id !== id));
+  const handleDeleteMeta = async (id: number) => {
+    try {
+      await planningService.delete(id);
+      setMetas(metas.filter(meta => meta.id !== id));
+    } catch (error) {
+      console.error('Erro ao excluir meta:', error);
+    }
   };
 
   const calcularProgresso = (valorAtual: number, valor: number) => {
@@ -118,6 +107,10 @@ const Planejamento: React.FC = () => {
     if (progresso >= 50) return 'info';
     return 'warning';
   };
+
+  if (loading) {
+    return <Typography>Carregando...</Typography>;
+  }
 
   return (
     <Box className="space-y-6">
@@ -154,8 +147,8 @@ const Planejamento: React.FC = () => {
                     </Box>
                     <Typography variant="h4" className="text-blue-600 mt-2">
                       R$ {metas
-                        .filter(m => m.categoria === 'curto')
-                        .reduce((acc, m) => acc + m.valor, 0)
+                        .filter(m => m.category === 'curto')
+                        .reduce((acc, m) => acc + m.targetValue, 0)
                         .toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </Typography>
                   </CardContent>
@@ -172,8 +165,8 @@ const Planejamento: React.FC = () => {
                     </Box>
                     <Typography variant="h4" className="text-green-600 mt-2">
                       R$ {metas
-                        .filter(m => m.categoria === 'medio')
-                        .reduce((acc, m) => acc + m.valor, 0)
+                        .filter(m => m.category === 'medio')
+                        .reduce((acc, m) => acc + m.targetValue, 0)
                         .toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </Typography>
                   </CardContent>
@@ -190,8 +183,8 @@ const Planejamento: React.FC = () => {
                     </Box>
                     <Typography variant="h4" className="text-purple-600 mt-2">
                       R$ {metas
-                        .filter(m => m.categoria === 'longo')
-                        .reduce((acc, m) => acc + m.valor, 0)
+                        .filter(m => m.category === 'longo')
+                        .reduce((acc, m) => acc + m.targetValue, 0)
                         .toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </Typography>
                   </CardContent>
@@ -218,15 +211,15 @@ const Planejamento: React.FC = () => {
               </TableHead>
               <TableBody>
                 {metas.map((meta) => {
-                  const progresso = calcularProgresso(meta.valorAtual, meta.valor);
+                  const progresso = calcularProgresso(meta.currentValue, meta.targetValue);
                   return (
                     <TableRow key={meta.id}>
-                      <TableCell>{meta.descricao}</TableCell>
+                      <TableCell>{meta.description}</TableCell>
                       <TableCell>
-                        R$ {meta.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        R$ {meta.targetValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </TableCell>
                       <TableCell>
-                        R$ {meta.valorAtual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        R$ {meta.currentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </TableCell>
                       <TableCell>
                         <Box className="w-full">
@@ -241,17 +234,12 @@ const Planejamento: React.FC = () => {
                           </Typography>
                         </Box>
                       </TableCell>
-                      <TableCell>{new Date(meta.prazo).toLocaleDateString('pt-BR')}</TableCell>
+                      <TableCell>{new Date(meta.deadline).toLocaleDateString('pt-BR')}</TableCell>
+                      <TableCell>{meta.category}</TableCell>
                       <TableCell>
-                        {meta.categoria.charAt(0).toUpperCase() + meta.categoria.slice(1)} Prazo
-                      </TableCell>
-                      <TableCell>
-                        <IconButton size="small">
-                          <EditIcon />
-                        </IconButton>
                         <IconButton
-                          size="small"
-                          onClick={() => handleDeleteMeta(meta.id)}
+                          color="error"
+                          onClick={() => handleDeleteMeta(meta.id!)}
                         >
                           <DeleteIcon />
                         </IconButton>
@@ -265,49 +253,49 @@ const Planejamento: React.FC = () => {
         </Grid>
       </Grid>
 
-      {/* Dialog para adicionar meta */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
+      {/* Dialog para Nova Meta */}
+      <Dialog open={openDialog} onClose={handleCloseDialog}>
         <DialogTitle>Nova Meta Financeira</DialogTitle>
         <DialogContent>
           <Box className="space-y-4 mt-2">
             <TextField
               fullWidth
               label="Descrição"
-              value={novaMeta.descricao}
-              onChange={(e) => setNovaMeta({ ...novaMeta, descricao: e.target.value })}
+              value={novaMeta.description}
+              onChange={(e) => setNovaMeta({ ...novaMeta, description: e.target.value })}
             />
             <TextField
               fullWidth
               label="Valor Alvo"
               type="number"
-              value={novaMeta.valor}
-              onChange={(e) => setNovaMeta({ ...novaMeta, valor: Number(e.target.value) })}
+              value={novaMeta.targetValue}
+              onChange={(e) => setNovaMeta({ ...novaMeta, targetValue: Number(e.target.value) })}
             />
             <TextField
               fullWidth
               label="Valor Atual"
               type="number"
-              value={novaMeta.valorAtual}
-              onChange={(e) => setNovaMeta({ ...novaMeta, valorAtual: Number(e.target.value) })}
+              value={novaMeta.currentValue}
+              onChange={(e) => setNovaMeta({ ...novaMeta, currentValue: Number(e.target.value) })}
             />
             <TextField
               fullWidth
               label="Prazo"
               type="date"
-              value={novaMeta.prazo}
-              onChange={(e) => setNovaMeta({ ...novaMeta, prazo: e.target.value })}
+              value={novaMeta.deadline}
+              onChange={(e) => setNovaMeta({ ...novaMeta, deadline: e.target.value })}
               InputLabelProps={{ shrink: true }}
             />
             <FormControl fullWidth>
               <InputLabel>Categoria</InputLabel>
               <Select
-                value={novaMeta.categoria}
+                value={novaMeta.category}
                 label="Categoria"
-                onChange={(e) => setNovaMeta({ ...novaMeta, categoria: e.target.value })}
+                onChange={(e) => setNovaMeta({ ...novaMeta, category: e.target.value as 'curto' | 'medio' | 'longo' })}
               >
                 {categorias.map((categoria) => (
                   <MenuItem key={categoria} value={categoria}>
-                    {categoria.charAt(0).toUpperCase() + categoria.slice(1)} Prazo
+                    {categoria.charAt(0).toUpperCase() + categoria.slice(1)}
                   </MenuItem>
                 ))}
               </Select>
@@ -317,7 +305,7 @@ const Planejamento: React.FC = () => {
         <DialogActions>
           <Button onClick={handleCloseDialog}>Cancelar</Button>
           <Button onClick={handleAddMeta} variant="contained" color="primary">
-            Adicionar
+            Salvar
           </Button>
         </DialogActions>
       </Dialog>

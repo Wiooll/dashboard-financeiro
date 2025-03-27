@@ -1,63 +1,81 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
   Paper,
   Grid,
-  Select,
-  MenuItem,
   FormControl,
   InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
+import { Line, Pie } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
-  BarElement,
-  ArcElement,
   Title,
   Tooltip,
   Legend,
+  ArcElement,
 } from 'chart.js';
-import { Line, Bar, Pie } from 'react-chartjs-2';
+import { reportService, FinancialReport } from '../services/reportService';
 
 ChartJS.register(
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
-  BarElement,
-  ArcElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  ArcElement
 );
 
 const Relatorios: React.FC = () => {
   const [periodo, setPeriodo] = useState('6');
+  const [loading, setLoading] = useState(true);
+  const [report, setReport] = useState<FinancialReport | null>(null);
 
-  // Dados para o gráfico de evolução patrimonial
+  useEffect(() => {
+    loadReport();
+  }, [periodo]);
+
+  const loadReport = async () => {
+    try {
+      const data = await reportService.getReport(periodo);
+      setReport(data);
+    } catch (error) {
+      console.error('Erro ao carregar relatório:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading || !report) {
+    return <Typography>Carregando...</Typography>;
+  }
+
   const dadosEvolucao = {
-    labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
+    labels: report.evolutionData.labels,
     datasets: [
       {
         label: 'Patrimônio Total',
-        data: [30000, 32000, 35000, 34000, 38000, 40000],
+        data: report.evolutionData.data,
         borderColor: 'rgb(59, 130, 246)',
         backgroundColor: 'rgba(59, 130, 246, 0.5)',
       },
     ],
   };
 
-  // Dados para o gráfico de distribuição de gastos
   const dadosGastos = {
-    labels: ['Moradia', 'Alimentação', 'Transporte', 'Educação', 'Saúde', 'Lazer', 'Outros'],
+    labels: report.expensesByCategory.labels,
     datasets: [
       {
         label: 'Gastos por Categoria',
-        data: [3000, 2000, 1500, 1000, 800, 500, 400],
+        data: report.expensesByCategory.data,
         backgroundColor: [
           'rgba(59, 130, 246, 0.5)',
           'rgba(16, 185, 129, 0.5)',
@@ -81,71 +99,31 @@ const Relatorios: React.FC = () => {
     ],
   };
 
-  // Dados para o gráfico de comparativo mensal
   const dadosComparativo = {
-    labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
+    labels: report.monthlyComparison.labels,
     datasets: [
       {
         label: 'Receitas',
-        data: [8000, 8200, 8500, 8300, 8500, 8500],
+        data: report.monthlyComparison.income,
         backgroundColor: 'rgba(16, 185, 129, 0.5)',
         borderColor: 'rgb(16, 185, 129)',
       },
       {
         label: 'Despesas',
-        data: [5000, 5100, 5200, 5100, 5200, 5200],
+        data: report.monthlyComparison.expenses,
         backgroundColor: 'rgba(239, 68, 68, 0.5)',
         borderColor: 'rgb(239, 68, 68)',
       },
     ],
   };
 
-  const opcoesGrafico = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: 'top' as const,
-      },
-      title: {
-        display: true,
-        text: 'Evolução Patrimonial',
-      },
-    },
-  };
-
-  const opcoesGastos = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: 'right' as const,
-      },
-      title: {
-        display: true,
-        text: 'Distribuição de Gastos',
-      },
-    },
-  };
-
-  const opcoesComparativo = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: 'top' as const,
-      },
-      title: {
-        display: true,
-        text: 'Comparativo Mensal',
-      },
-    },
-  };
-
   return (
     <Box className="space-y-6">
       <Box className="flex justify-between items-center">
         <Typography variant="h4" className="text-gray-800">
-          Relatórios e Análises
+          Relatórios Financeiros
         </Typography>
-        <FormControl sx={{ minWidth: 200 }}>
+        <FormControl className="w-48">
           <InputLabel>Período</InputLabel>
           <Select
             value={periodo}
@@ -160,27 +138,6 @@ const Relatorios: React.FC = () => {
       </Box>
 
       <Grid container spacing={3}>
-        {/* Evolução Patrimonial */}
-        <Grid item xs={12}>
-          <Paper className="p-4">
-            <Line options={opcoesGrafico} data={dadosEvolucao} />
-          </Paper>
-        </Grid>
-
-        {/* Distribuição de Gastos */}
-        <Grid item xs={12} md={6}>
-          <Paper className="p-4">
-            <Pie options={opcoesGastos} data={dadosGastos} />
-          </Paper>
-        </Grid>
-
-        {/* Comparativo Mensal */}
-        <Grid item xs={12} md={6}>
-          <Paper className="p-4">
-            <Bar options={opcoesComparativo} data={dadosComparativo} />
-          </Paper>
-        </Grid>
-
         {/* Resumo Financeiro */}
         <Grid item xs={12}>
           <Paper className="p-4">
@@ -190,45 +147,71 @@ const Relatorios: React.FC = () => {
             <Grid container spacing={2}>
               <Grid item xs={12} md={3}>
                 <Box className="bg-green-50 p-4 rounded-lg">
-                  <Typography variant="h6" className="text-green-800">
+                  <Typography variant="subtitle2" className="text-green-800">
                     Receitas Totais
                   </Typography>
-                  <Typography variant="h4" className="text-green-600">
-                    R$ 50.000,00
+                  <Typography variant="h5" className="text-green-600">
+                    R$ {report.totalIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </Typography>
                 </Box>
               </Grid>
               <Grid item xs={12} md={3}>
                 <Box className="bg-red-50 p-4 rounded-lg">
-                  <Typography variant="h6" className="text-red-800">
+                  <Typography variant="subtitle2" className="text-red-800">
                     Despesas Totais
                   </Typography>
-                  <Typography variant="h4" className="text-red-600">
-                    R$ 30.700,00
+                  <Typography variant="h5" className="text-red-600">
+                    R$ {report.totalExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </Typography>
                 </Box>
               </Grid>
               <Grid item xs={12} md={3}>
                 <Box className="bg-blue-50 p-4 rounded-lg">
-                  <Typography variant="h6" className="text-blue-800">
+                  <Typography variant="subtitle2" className="text-blue-800">
                     Economia
                   </Typography>
-                  <Typography variant="h4" className="text-blue-600">
-                    R$ 19.300,00
+                  <Typography variant="h5" className="text-blue-600">
+                    R$ {report.savings.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </Typography>
                 </Box>
               </Grid>
               <Grid item xs={12} md={3}>
                 <Box className="bg-purple-50 p-4 rounded-lg">
-                  <Typography variant="h6" className="text-purple-800">
+                  <Typography variant="subtitle2" className="text-purple-800">
                     Taxa de Economia
                   </Typography>
-                  <Typography variant="h4" className="text-purple-600">
-                    38,6%
+                  <Typography variant="h5" className="text-purple-600">
+                    {report.savingsRate.toFixed(1)}%
                   </Typography>
                 </Box>
               </Grid>
             </Grid>
+          </Paper>
+        </Grid>
+
+        {/* Gráficos */}
+        <Grid item xs={12} md={8}>
+          <Paper className="p-4">
+            <Typography variant="h6" className="mb-4">
+              Evolução Patrimonial
+            </Typography>
+            <Line data={dadosEvolucao} />
+          </Paper>
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Paper className="p-4">
+            <Typography variant="h6" className="mb-4">
+              Distribuição de Gastos
+            </Typography>
+            <Pie data={dadosGastos} />
+          </Paper>
+        </Grid>
+        <Grid item xs={12}>
+          <Paper className="p-4">
+            <Typography variant="h6" className="mb-4">
+              Comparativo Mensal
+            </Typography>
+            <Line data={dadosComparativo} />
           </Paper>
         </Grid>
       </Grid>
