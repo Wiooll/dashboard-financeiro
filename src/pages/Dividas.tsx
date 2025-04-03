@@ -54,32 +54,7 @@ const tiposDivida = [
 ];
 
 const Dividas: React.FC = () => {
-  const [dividas, setDividas] = useState<Divida[]>([
-    {
-      id: 1,
-      descricao: 'Cartão de Crédito Nubank',
-      valor: 2500,
-      valorPago: 0,
-      dataVencimento: '2024-03-15',
-      status: 'pendente',
-      tipo: 'cartao',
-      juros: 0,
-      parcelas: 1,
-      parcelaAtual: 1,
-    },
-    {
-      id: 2,
-      descricao: 'Financiamento Carro',
-      valor: 15000,
-      valorPago: 5000,
-      dataVencimento: '2024-03-20',
-      status: 'pendente',
-      tipo: 'financiamento',
-      juros: 1.5,
-      parcelas: 48,
-      parcelaAtual: 12,
-    },
-  ]);
+  const [dividas, setDividas] = useState<Divida[]>([]);
 
   const [openDialog, setOpenDialog] = useState(false);
   const [novaDivida, setNovaDivida] = useState<Partial<Divida>>({
